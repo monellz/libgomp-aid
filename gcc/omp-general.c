@@ -139,7 +139,8 @@ omp_extract_for_data (gomp_for *for_stmt, struct omp_for_data *fd,
   fd->tiling = NULL_TREE;
   fd->collapse = 1;
   fd->ordered = 0;
-  fd->sched_kind = OMP_CLAUSE_SCHEDULE_STATIC;
+  // fd->sched_kind = OMP_CLAUSE_SCHEDULE_STATIC;
+  fd->sched_kind = OMP_CLAUSE_SCHEDULE_RUNTIME;
   fd->sched_modifiers = 0;
   fd->chunk_size = NULL_TREE;
   fd->simd_schedule = false;
