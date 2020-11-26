@@ -190,6 +190,18 @@ GOMP_loop_ull_runtime_start (bool up, gomp_ull start, gomp_ull end,
 	 driven choice.  */
       return gomp_loop_ull_static_start (up, start, end, incr,
 					 0, istart, iend);
+    case GFS_AID_STATIC:
+      gomp_error ("gomp_loop_ull_aid_static_start is now unimplemented");
+      abort();
+      break;
+    case GFS_AID_DYNAMIC:
+      gomp_error ("gomp_loop_ull_aid_dynamic_start is now unimplemented");
+      abort();
+      break;
+    case GFS_AID_HYBRID:
+      gomp_error ("gomp_loop_ull_aid_hybrid_start is now unimplemented");
+      abort();
+      break;
     default:
       abort ();
     }

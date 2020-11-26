@@ -127,6 +127,21 @@ parse_schedule (void)
       gomp_global_icv.run_sched_var = GFS_AUTO;
       env += 4;
     }
+  else if (strncasecmp (env, "aid-static", 10) == 0)
+    {
+      gomp_global_icv.run_sched_var = GFS_AID_STATIC;
+      env += 10;
+    }
+  else if (strncasecmp (env, "aid-dynamic", 11) == 0)
+    {
+      gomp_global_icv.run_sched_var = GFS_AID_DYNAMIC;
+      env += 11;
+    }
+  else if (strncasecmp (env, "aid-hybrid", 10) == 0)
+    {
+      gomp_global_icv.run_sched_var = GFS_AID_HYBRID;
+      env += 10;
+    }
   else
     goto unknown;
 
@@ -1129,6 +1144,15 @@ handle_omp_display_env (unsigned long stacksize, int wait_policy)
       break;
     case GFS_DYNAMIC:
       fputs ("DYNAMIC", stderr);
+      break;
+    case GFS_AID_STATIC:
+      fputs ("AID_STATIC", stderr);
+      break;
+    case GFS_AID_DYNAMIC:
+      fputs ("AID_DYNAMIC", stderr);
+      break;
+    case GFS_AID_HYBRID:
+      fputs ("AID_HYBRID", stderr);
       break;
     case GFS_GUIDED:
       fputs ("GUIDED", stderr);

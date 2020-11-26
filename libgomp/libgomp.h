@@ -136,6 +136,9 @@ enum gomp_schedule_type
   GFS_RUNTIME,
   GFS_STATIC,
   GFS_DYNAMIC,
+  GFS_AID_STATIC,
+  GFS_AID_DYNAMIC,
+  GFS_AID_HYBRID,
   GFS_GUIDED,
   GFS_AUTO
 };

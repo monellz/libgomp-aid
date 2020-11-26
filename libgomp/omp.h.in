@@ -49,8 +49,11 @@ typedef enum omp_sched_t
 {
   omp_sched_static = 1,
   omp_sched_dynamic = 2,
-  omp_sched_guided = 3,
-  omp_sched_auto = 4
+  omp_sched_aid_static = 3,
+  omp_sched_aid_dynamic = 4,
+  omp_sched_aid_hybrid = 5,
+  omp_sched_guided = 6,
+  omp_sched_auto = 7
 } omp_sched_t;
 
 typedef enum omp_proc_bind_t

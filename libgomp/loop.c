@@ -169,6 +169,72 @@ gomp_loop_guided_start (long start, long end, long incr, long chunk_size,
   return ret;
 }
 
+static bool
+gomp_loop_aid_static_start (long start, long end, long incr, long chunk_size,
+			long *istart, long *iend)
+{
+  /*
+  struct gomp_thread *thr = gomp_thread ();
+
+  thr->ts.static_trip = 0;
+  if (gomp_work_share_start (false))
+    {
+      gomp_loop_init (thr->ts.work_share, start, end, incr,
+		      GFS_STATIC, chunk_size);
+      gomp_work_share_init_done ();
+    }
+
+  return !gomp_iter_static_next (istart, iend);
+  */
+  gomp_error ("AID static start is now unimplemented");
+  abort();
+  return false;
+}
+
+static bool
+gomp_loop_aid_dynamic_start (long start, long end, long incr, long chunk_size,
+			long *istart, long *iend)
+{
+  /*
+  struct gomp_thread *thr = gomp_thread ();
+
+  thr->ts.static_trip = 0;
+  if (gomp_work_share_start (false))
+    {
+      gomp_loop_init (thr->ts.work_share, start, end, incr,
+		      GFS_STATIC, chunk_size);
+      gomp_work_share_init_done ();
+    }
+
+  return !gomp_iter_static_next (istart, iend);
+  */
+  gomp_error ("AID dynamic start is now unimplemented");
+  abort();
+  return false;
+}
+
+static bool
+gomp_loop_aid_hybrid_start (long start, long end, long incr, long chunk_size,
+			long *istart, long *iend)
+{
+  /*
+  struct gomp_thread *thr = gomp_thread ();
+
+  thr->ts.static_trip = 0;
+  if (gomp_work_share_start (false))
+    {
+      gomp_loop_init (thr->ts.work_share, start, end, incr,
+		      GFS_STATIC, chunk_size);
+      gomp_work_share_init_done ();
+    }
+
+  return !gomp_iter_static_next (istart, iend);
+  */
+  gomp_error ("AID hybrid start is now unimplemented");
+  abort();
+  return false;
+}
+
 bool
 GOMP_loop_runtime_start (long start, long end, long incr,
 			 long *istart, long *iend)
@@ -184,6 +250,18 @@ GOMP_loop_runtime_start (long start, long end, long incr,
       return gomp_loop_dynamic_start (start, end, incr,
 				      icv->run_sched_chunk_size,
 				      istart, iend);
+    case GFS_AID_STATIC:
+      return gomp_loop_aid_static_start(start, end, incr,
+              icv->run_sched_chunk_size,
+              istart, iend);
+    case GFS_AID_DYNAMIC:
+      return gomp_loop_aid_dynamic_start(start, end, incr,
+              icv->run_sched_chunk_size,
+              istart, iend);
+    case GFS_AID_HYBRID:
+      return gomp_loop_aid_hybrid_start(start, end, incr,
+              icv->run_sched_chunk_size,
+              istart, iend);
     case GFS_GUIDED:
       return gomp_loop_guided_start (start, end, incr,
 				     icv->run_sched_chunk_size,
