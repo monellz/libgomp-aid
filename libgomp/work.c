@@ -116,6 +116,12 @@ gomp_init_work_share (struct gomp_work_share *ws, bool ordered,
     ws->ordered_team_ids = NULL;
   gomp_ptrlock_init (&ws->next_ws, NULL);
   ws->threads_completed = 0;
+
+  // AID: init timestamp and other fields
+  ws->aid_chunk_start_time = gomp_malloc (nthreads * sizeof (*ws->aid_chunk_start_time));
+  ws->aid_chunk_end_time = gomp_malloc (nthreads * sizeof (*ws->aid_chunk_end_time));
+  ws->aid_threads_sampling_completed = 0;
+  ws->aid_sf = 1; // default speedup
 }
 
 /* Do any needed destruction of gomp_work_share fields before it
@@ -127,6 +133,10 @@ gomp_fini_work_share (struct gomp_work_share *ws)
   gomp_mutex_destroy (&ws->lock);
   if (ws->ordered_team_ids != ws->inline_ordered_team_ids)
     free (ws->ordered_team_ids);
+  
+  // AID: free timestamp
+  free (ws->aid_chunk_start_time);
+  free (ws->aid_chunk_end_time);
   gomp_ptrlock_destroy (&ws->next_ws);
 }
 

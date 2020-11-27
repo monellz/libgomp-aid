@@ -186,9 +186,27 @@ gomp_loop_aid_static_start (long start, long end, long incr, long chunk_size,
 
   return !gomp_iter_static_next (istart, iend);
   */
-  gomp_error ("AID static start is now unimplemented");
-  abort();
-  return false;
+
+  struct gomp_thread *thr = gomp_thread ();
+  bool ret;
+
+  if (gomp_work_share_start (false))
+    {
+      gomp_loop_init (thr->ts.work_share, start, end, incr,
+		      GFS_DYNAMIC, chunk_size);
+      gomp_work_share_init_done ();
+    }
+
+#ifdef HAVE_SYNC_BUILTINS
+  ret = gomp_iter_aid_static_next (istart, iend);
+#else
+  gomp_fatal ("AID static need lock-free support");
+  //gomp_mutex_lock (&thr->ts.work_share->lock);
+  //ret = gomp_iter_dynamic_next_locked (istart, iend);
+  //gomp_mutex_unlock (&thr->ts.work_share->lock);
+#endif
+
+  return ret;
 }
 
 static bool

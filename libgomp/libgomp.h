@@ -190,6 +190,15 @@ struct gomp_work_share
 
   int mode;
 
+  /* AID: sf is the speedup between big cores and little cores */
+  unsigned aid_sf;
+
+  /* AID: the number of threads that have finished SAMPLING phase*/
+  unsigned aid_threads_sampling_completed;
+
+  unsigned long *aid_chunk_start_time;
+  unsigned long *aid_chunk_end_time;
+
   union {
     struct {
       /* This is the chunk_size argument to the SCHEDULE clause.  */
@@ -720,6 +729,7 @@ extern bool gomp_iter_dynamic_next_locked (long *, long *);
 extern bool gomp_iter_guided_next_locked (long *, long *);
 
 #ifdef HAVE_SYNC_BUILTINS
+extern bool gomp_iter_aid_static_next (long *, long *);
 extern bool gomp_iter_dynamic_next (long *, long *);
 extern bool gomp_iter_guided_next (long *, long *);
 #endif

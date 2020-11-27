@@ -250,6 +250,81 @@ gomp_iter_dynamic_next (long *pstart, long *pend)
   *pend = nend;
   return true;
 }
+
+
+bool
+gomp_iter_aid_static_next (long *pstart, long *pend)
+{
+  struct gomp_thread *thr = gomp_thread ();
+  struct gomp_work_share *ws = thr->ts.work_share;
+  long start, end, nend, chunk, incr;
+
+  end = ws->end;
+  incr = ws->incr;
+  chunk = ws->chunk_size;
+
+  if (__builtin_expect (ws->mode, 1))
+    {
+      long tmp = __sync_fetch_and_add (&ws->next, chunk);
+      if (incr > 0)
+	{
+	  if (tmp >= end)
+	    return false;
+	  nend = tmp + chunk;
+	  if (nend > end)
+	    nend = end;
+	  *pstart = tmp;
+	  *pend = nend;
+	  return true;
+	}
+      else
+	{
+	  if (tmp <= end)
+	    return false;
+	  nend = tmp + chunk;
+	  if (nend < end)
+	    nend = end;
+	  *pstart = tmp;
+	  *pend = nend;
+	  return true;
+	}
+    }
+
+  gomp_fatal("unimplemented for gomp_work_share->mode != 1");
+
+  start = __atomic_load_n (&ws->next, MEMMODEL_RELAXED);
+  while (1)
+    {
+      long left = end - start;
+      long tmp;
+
+      if (start == end)
+	return false;
+
+      if (incr < 0)
+	{
+	  if (chunk < left)
+	    chunk = left;
+	}
+      else
+	{
+	  if (chunk > left)
+	    chunk = left;
+	}
+      nend = start + chunk;
+
+      tmp = __sync_val_compare_and_swap (&ws->next, start, nend);
+      if (__builtin_expect (tmp == start, 1))
+	break;
+
+      start = tmp;
+    }
+
+  *pstart = start;
+  *pend = nend;
+  return true;
+}
+
 #endif /* HAVE_SYNC_BUILTINS */
 
 
