@@ -120,8 +120,13 @@ gomp_init_work_share (struct gomp_work_share *ws, bool ordered,
   // AID: init timestamp and other fields
   ws->aid_chunk_start_time = gomp_malloc (nthreads * sizeof (*ws->aid_chunk_start_time));
   ws->aid_chunk_end_time = gomp_malloc (nthreads * sizeof (*ws->aid_chunk_end_time));
-  ws->aid_threads_sampling_completed = 0;
-  ws->aid_sf = 1; // default speedup
+  ws->aid_allocated_iter = gomp_malloc (nthreads * sizeof (*ws->aid_allocated_iter));
+  memset (ws->aid_allocated_iter, '\0', nthreads * sizeof (*ws->aid_allocated_iter));
+
+  ws->aid_thread_sampling_completed = 0;
+  ws->aid_sf = 0; // default speedup
+  ws->aid_states = gomp_malloc (nthreads * sizeof (*ws->aid_states));
+  memset (ws->aid_states, '\0', nthreads * sizeof (*ws->aid_states));
 }
 
 /* Do any needed destruction of gomp_work_share fields before it
@@ -137,6 +142,8 @@ gomp_fini_work_share (struct gomp_work_share *ws)
   // AID: free timestamp
   free (ws->aid_chunk_start_time);
   free (ws->aid_chunk_end_time);
+  free (ws->aid_allocated_iter);
+  free (ws->aid_states);
   gomp_ptrlock_destroy (&ws->next_ws);
 }
 

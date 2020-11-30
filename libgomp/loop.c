@@ -28,6 +28,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include "libgomp.h"
+#include <stdio.h>
 
 
 /* Initialize the given work share construct from the given arguments.  */
@@ -43,7 +44,11 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 	    ? start : end;
   ws->incr = incr;
   ws->next = start;
-  if (sched == GFS_DYNAMIC)
+  ws->aid_ni = incr > 0? ws->end - start: start - ws->end;
+  if (sched == GFS_DYNAMIC
+      || sched == GFS_AID_STATIC
+      || sched == GFS_AID_DYNAMIC
+      || sched == GFS_AID_HYBRID)
     {
       ws->chunk_size *= incr;
 
@@ -57,6 +62,7 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 
 	if (__builtin_expect (incr > 0, 1))
 	  {
+      printf ("into overflow protection mode=%d\n",ws->mode);
 	    /* Cheap overflow protection.  */
 	    if (__builtin_expect ((nthreads | ws->chunk_size)
 				  >= 1UL << (sizeof (long)
@@ -65,6 +71,7 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 	    else
 	      ws->mode = ws->end < (LONG_MAX
 				    - (nthreads + 1) * ws->chunk_size);
+      printf ("out overflow protection mode=%d\n",ws->mode);
 	  }
 	/* Cheap overflow protection.  */
 	else if (__builtin_expect ((nthreads | -ws->chunk_size)
@@ -122,6 +129,8 @@ gomp_loop_dynamic_start (long start, long end, long incr, long chunk_size,
 {
   struct gomp_thread *thr = gomp_thread ();
   bool ret;
+  //gomp_error ("gomp tid: %d into start\n", thr->ts.team_id);
+  printf ("gomp tid: %d into gomp_loop_dynamic_start\n", thr->ts.team_id);
 
   if (gomp_work_share_start (false))
     {
@@ -131,6 +140,8 @@ gomp_loop_dynamic_start (long start, long end, long incr, long chunk_size,
     }
 
 #ifdef HAVE_SYNC_BUILTINS
+  printf ("gomp tid: %d into dynamic_next in start\n", thr->ts.team_id);
+  printf ("gomp config chunk:%ld, end:%ld, incr:%ld\n", thr->ts.work_share->chunk_size, thr->ts.work_share->end, thr->ts.work_share->incr);
   ret = gomp_iter_dynamic_next (istart, iend);
 #else
   gomp_mutex_lock (&thr->ts.work_share->lock);
@@ -193,7 +204,7 @@ gomp_loop_aid_static_start (long start, long end, long incr, long chunk_size,
   if (gomp_work_share_start (false))
     {
       gomp_loop_init (thr->ts.work_share, start, end, incr,
-		      GFS_DYNAMIC, chunk_size);
+		      GFS_AID_STATIC, chunk_size);
       gomp_work_share_init_done ();
     }
 
@@ -548,10 +559,33 @@ gomp_loop_guided_next (long *istart, long *iend)
   return ret;
 }
 
+static bool
+gomp_loop_aid_static_next (long *istart, long *iend)
+{
+  bool ret;
+  //printf("gomp tid: %d into gomp_loop_aid_static_next\n", gomp_thread()->ts.team_id);
+
+#ifdef HAVE_SYNC_BUILTINS
+  //printf("gomp tid: %d into aid_static_next in next\n", gomp_thread()->ts.team_id);
+  ret = gomp_iter_aid_static_next (istart, iend);
+#else
+  /*
+  struct gomp_thread *thr = gomp_thread ();
+  gomp_mutex_lock (&thr->ts.work_share->lock);
+  ret = gomp_iter_dynamic_next_locked (istart, iend);
+  gomp_mutex_unlock (&thr->ts.work_share->lock);
+  */
+  gomp_fatal ("unimplemented for gomp_iter_aid_static_next_locked");
+#endif
+
+  return ret;
+}
+
 bool
 GOMP_loop_runtime_next (long *istart, long *iend)
 {
   struct gomp_thread *thr = gomp_thread ();
+  //printf ("gomp tid: %d, into GOMP_loop_runtime_next, sched=%d\n", thr->ts.team_id, thr->ts.work_share->sched);
   
   switch (thr->ts.work_share->sched)
     {
@@ -562,6 +596,12 @@ GOMP_loop_runtime_next (long *istart, long *iend)
       return gomp_loop_dynamic_next (istart, iend);
     case GFS_GUIDED:
       return gomp_loop_guided_next (istart, iend);
+    case GFS_AID_STATIC:
+      return gomp_loop_aid_static_next (istart, iend);
+    case GFS_AID_DYNAMIC:
+      gomp_fatal ("unimplemented for gfs aid dynamic next");
+    case GFS_AID_HYBRID:
+      gomp_fatal ("unimplemented for gfs aid hybrid next");
     default:
       abort ();
     }

@@ -181,6 +181,13 @@ struct gomp_doacross_work_share
   unsigned int shift_counts[];
 };
 
+enum aid_state_type {
+  AID_INIT = 0,
+  AID_SAMPLING = 1,
+  AID_RUNNING = 2,
+  AID_WAITING =3 
+};
+
 struct gomp_work_share
 {
   /* This member records the SCHEDULE clause to be used for this construct.
@@ -190,14 +197,26 @@ struct gomp_work_share
 
   int mode;
 
-  /* AID: sf is the speedup between big cores and little cores */
+  /* AID: sf is the speedup between big cores and little cores.
+     The default value is 0, which is used to test whether all threads
+     are prepared for AID RUNNING. */
+
+  // WARNING: value overflow ???
   unsigned aid_sf;
+  unsigned aid_k;
 
   /* AID: the number of threads that have finished SAMPLING phase*/
-  unsigned aid_threads_sampling_completed;
+  unsigned aid_thread_sampling_completed;
+
+
+  unsigned long aid_ni;
+
+  unsigned long *aid_allocated_iter;
 
   unsigned long *aid_chunk_start_time;
   unsigned long *aid_chunk_end_time;
+
+  enum aid_state_type *aid_states;
 
   union {
     struct {
