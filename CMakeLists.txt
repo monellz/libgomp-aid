@@ -68,8 +68,8 @@ ExternalProject_Add(MPC
                     --with-gmp-include=${CMAKE_BINARY_DIR}/include 
                     --with-gmp-lib=${CMAKE_BINARY_DIR}/lib
   BUILD_COMMAND     make -j${NPROC}
+  DEPENDS           MPFR GMP
 )
-ExternalProject_Add_StepDependencies(MPC build MPFR GMP)
 
 ExternalProject_Add(GCC
   PREFIX            GCC
@@ -79,14 +79,8 @@ ExternalProject_Add(GCC
                     export GCC_INSTALL_DIR=<INSTALL_DIR> &&
                     export GCC_SOURCE_DIR=<SOURCE_DIR> &&
                     ${PROJECT_SOURCE_DIR}/scripts/gcc_configure.sh
-  BUILD_COMMAND     rsync -a --delete --info=progress2 ${PROJECT_SOURCE_DIR}/gcc/ <SOURCE_DIR>/gcc &&
-                    rsync -a --delete --info=progress2 ${PROJECT_SOURCE_DIR}/libgomp/ <SOURCE_DIR>/libgomp &&
-                    make -j${NPROC}
+  UPDATE_COMMAND    rsync -a --delete --info=progress2 ${PROJECT_SOURCE_DIR}/gcc/ <SOURCE_DIR>/gcc &&
+                    rsync -a --delete --info=progress2 ${PROJECT_SOURCE_DIR}/libgomp/ <SOURCE_DIR>/libgomp
+  BUILD_COMMAND     make -j${NPROC}
+  DEPENDS           MPFR GMP MPC ISL ZLIB
 )
-
-ExternalProject_Add_StepDependencies(GCC build MPFR GMP MPC ISL ZLIB OPENMP_AID)
-
-file(GLOB AID_GOMP_SRC ${PROJECT_SOURCE_DIR}/libgomp/*)
-file(GLOB AID_GCC_SRC ${PROJECT_SOURCE_DIR}/gcc/*)
-add_custom_target(OPENMP_AID ALL
-    DEPENDS ${AID_GOMP_SRC} ${AID_GCC_SRC})
