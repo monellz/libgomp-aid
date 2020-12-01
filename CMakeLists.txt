@@ -15,7 +15,7 @@ set(MPFR_URL "https://www.mpfr.org/mpfr-${MPFR_VERSION}/mpfr-${MPFR_VERSION}.zip
 set(GMP_URL "https://gmplib.org/download/gmp/gmp-${GMP_VERSION}.tar.bz2")
 set(ISL_URL "http://isl.gforge.inria.fr/isl-${ISL_VERSION}.tar.bz2")
 set(MPC_URL "https://ftp.gnu.org/gnu/mpc/mpc-${MPC_VERSION}.tar.gz")
-set(ZLIB_URL "https://zlib.net/fossils/zlib-1.2.11.tar.gz")
+set(ZLIB_URL "https://zlib.net/fossils/zlib-${ZLIB_VERSION}.tar.gz")
 set(GCC_URL "http://ftp.tsukuba.wide.ad.jp/software/gcc/releases/gcc-${GCC_VERSION}/gcc-${GCC_VERSION}.tar.xz")
 
 include(ProcessorCount)
