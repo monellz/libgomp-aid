@@ -211,10 +211,9 @@ struct gomp_work_share
 
   unsigned long aid_ni;
 
-  unsigned long *aid_allocated_iter;
+  long *aid_allocated_iter;
 
-  unsigned long *aid_chunk_start_time;
-  unsigned long *aid_chunk_end_time;
+  unsigned long *aid_consumed_time;
 
   enum aid_state_type *aid_states;
 

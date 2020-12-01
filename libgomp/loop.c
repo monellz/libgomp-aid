@@ -62,7 +62,6 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 
 	if (__builtin_expect (incr > 0, 1))
 	  {
-      printf ("into overflow protection mode=%d\n",ws->mode);
 	    /* Cheap overflow protection.  */
 	    if (__builtin_expect ((nthreads | ws->chunk_size)
 				  >= 1UL << (sizeof (long)
@@ -71,7 +70,6 @@ gomp_loop_init (struct gomp_work_share *ws, long start, long end, long incr,
 	    else
 	      ws->mode = ws->end < (LONG_MAX
 				    - (nthreads + 1) * ws->chunk_size);
-      printf ("out overflow protection mode=%d\n",ws->mode);
 	  }
 	/* Cheap overflow protection.  */
 	else if (__builtin_expect ((nthreads | -ws->chunk_size)
@@ -129,8 +127,6 @@ gomp_loop_dynamic_start (long start, long end, long incr, long chunk_size,
 {
   struct gomp_thread *thr = gomp_thread ();
   bool ret;
-  //gomp_error ("gomp tid: %d into start\n", thr->ts.team_id);
-  printf ("gomp tid: %d into gomp_loop_dynamic_start\n", thr->ts.team_id);
 
   if (gomp_work_share_start (false))
     {
@@ -140,8 +136,6 @@ gomp_loop_dynamic_start (long start, long end, long incr, long chunk_size,
     }
 
 #ifdef HAVE_SYNC_BUILTINS
-  printf ("gomp tid: %d into dynamic_next in start\n", thr->ts.team_id);
-  printf ("gomp config chunk:%ld, end:%ld, incr:%ld\n", thr->ts.work_share->chunk_size, thr->ts.work_share->end, thr->ts.work_share->incr);
   ret = gomp_iter_dynamic_next (istart, iend);
 #else
   gomp_mutex_lock (&thr->ts.work_share->lock);
@@ -563,10 +557,8 @@ static bool
 gomp_loop_aid_static_next (long *istart, long *iend)
 {
   bool ret;
-  //printf("gomp tid: %d into gomp_loop_aid_static_next\n", gomp_thread()->ts.team_id);
 
 #ifdef HAVE_SYNC_BUILTINS
-  //printf("gomp tid: %d into aid_static_next in next\n", gomp_thread()->ts.team_id);
   ret = gomp_iter_aid_static_next (istart, iend);
 #else
   /*
@@ -585,7 +577,6 @@ bool
 GOMP_loop_runtime_next (long *istart, long *iend)
 {
   struct gomp_thread *thr = gomp_thread ();
-  //printf ("gomp tid: %d, into GOMP_loop_runtime_next, sched=%d\n", thr->ts.team_id, thr->ts.work_share->sched);
   
   switch (thr->ts.work_share->sched)
     {

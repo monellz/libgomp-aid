@@ -29,7 +29,19 @@
 #include "libgomp.h"
 #include <stdlib.h>
 #include <sys/time.h>
+
+
+#define AID_DEBUG
+
+#ifdef AID_DEBUG
 #include <stdio.h>
+#define AID_LOG(format, ...) \
+    do {    \
+        fprintf(stdout, "[AID] " format "\n", ##__VA_ARGS__); \
+    } while (0)
+#elif
+#define AID_LOG(...) do {} while (0)
+#endif
 
 /* This function implements the STATIC scheduling method.  The caller should
    iterate *pstart <= x < *pend.  Return zero if there are more iterations
@@ -262,34 +274,65 @@ gomp_iter_aid_static_next (long *pstart, long *pend)
 
   unsigned thread_id = thr->ts.team_id;
   unsigned nthreads = thr->ts.team->nthreads;
+  // TODO: it should be more general
+  bool on_big_core = thread_id >= nthreads / 2;
 
   end = ws->end;
   incr = ws->incr;
   chunk = ws->chunk_size;
-  printf ("gomp tid: %d, into gomp_iter_aid_static_next, ws->mode=%d\n", thread_id, ws->mode);
-  printf ("\tgomp tid: %d, config chunk:%ld, end:%ld, incr:%ld, next:%ld\n", thread_id, thr->ts.work_share->chunk_size, thr->ts.work_share->end, thr->ts.work_share->incr, thr->ts.work_share->next);
 
-  #define AID_RUNNING_NEXT_BY(_chunk)                     \
-    do {                                                  \
-      if (_chunk == 0) return false;                      \
-      long tmp = __sync_fetch_and_add(&ws->next, _chunk); \
-      if (incr > 0) {                                     \
-        ws->aid_allocated_iter[thread_id] += _chunk;      \
-        if (tmp >= end) return false;                     \
-        nend = tmp + _chunk;                              \
-        if (nend > end) nend = end;                       \
-        *pstart = tmp;                                    \
-        *pend = nend;                                     \
-        return true;                                      \
-      } else {                                            \
-        ws->aid_allocated_iter[thread_id] -= _chunk;      \
-        if (tmp <= end) return false;                     \
-        nend = tmp + _chunk;                              \
-        if (nend < end) nend = end;                       \
-        *pstart = tmp;                                    \
-        *pend = nend;                                     \
-        return true;                                      \
-      }                                                   \
+  AID_LOG ("tid: %d, into gomp_iter_aid_static_next, ws->mode=%d", thread_id, ws->mode);
+  AID_LOG ("\ttid: %d, config chunk:%ld, end:%ld, incr:%ld, next:%ld", thread_id, ws->chunk_size, ws->end, ws->incr, ws->next);
+
+  #define STEAL_NEXT_BY(_chunk) \
+    do { \
+      long tmp = __sync_fetch_and_add (&ws->next, _chunk); \
+      if (incr > 0) { \
+        if (tmp >= end) return false; \
+        nend = tmp + _chunk; \
+        ws->aid_allocated_iter[thread_id] += _chunk; \
+        if (nend > end) nend = end; \
+        *pstart = tmp; \
+        *pend = nend; \
+        return true; \
+      } else { \
+        if (tmp <= end) return false; \
+        nend = tmp + _chunk; \
+        ws->aid_allocated_iter[thread_id] += _chunk; \
+        if (nend < end) nend = end; \
+        *pstart = tmp; \
+        *pend = nend; \
+        return true; \
+      } \
+    } while (0)
+
+  #define AID_STATIC_NEXT_WITH(_k, _sf, _on_big_core) \
+    do { \
+      long _chunk = _on_big_core? _k * _sf: _k; \
+      _chunk -= ws->aid_allocated_iter[thread_id];  \
+      if (incr > 0) { \
+        if (_chunk <= 0) return false; \
+        AID_LOG ("tid (%d) allocated %ld iter, with %ld iter executed", thread_id, _chunk, ws->aid_allocated_iter[thread_id]); \
+        long tmp = __sync_fetch_and_add(&ws->next, _chunk); \
+        if (tmp >= end) return false; \
+        ws->aid_allocated_iter[thread_id] += _chunk; \
+        nend = tmp + _chunk; \
+        if (nend > end) nend = end; \
+        *pstart = tmp; \
+        *pend = nend; \
+        return true; \
+      } else { \
+        if (_chunk >= 0) return false; \
+        AID_LOG ("tid (%d) allocated %ld iter, with %ld iter executed", thread_id, _chunk, ws->aid_allocated_iter[thread_id]); \
+        long tmp = __sync_fetch_and_add(&ws->next, _chunk); \
+        if (tmp <= end) return false; \
+        ws->aid_allocated_iter[thread_id] += _chunk; \
+        nend = tmp + _chunk; \
+        if (nend < end) nend = end; \
+        *pstart = tmp; \
+        *pend = nend; \
+        return true; \
+      } \
     } while (0)
 
   if (__builtin_expect (ws->mode, 1)) {
@@ -297,19 +340,39 @@ gomp_iter_aid_static_next (long *pstart, long *pend)
       case AID_INIT: {
         ws->aid_states[thread_id] = AID_SAMPLING;
 
+        // There might be some delay so the clock must be started after it
+        long tmp = __sync_fetch_and_add(&ws->next, chunk);
+
         // start clock
         struct timeval tv;
         gettimeofday(&tv, NULL);
-        ws->aid_chunk_start_time[thread_id] = tv.tv_sec * 1000000 + tv.tv_usec;
+        ws->aid_consumed_time[thread_id] = tv.tv_sec * 1000000 + tv.tv_usec;
 
-        AID_RUNNING_NEXT_BY(chunk);
+        if (incr > 0) {
+          if (tmp >= end) return false;
+          nend = tmp + chunk;
+          ws->aid_allocated_iter[thread_id] += chunk; 
+          if (nend > end) nend = end;
+          *pstart = tmp;
+          *pend = nend;
+          return true;
+        } else {
+          if (tmp <= end) return false;
+          nend = tmp + chunk;
+          ws->aid_allocated_iter[thread_id] += chunk; 
+          if (nend < end) nend = end;
+          *pstart = tmp;
+          *pend = nend;
+          return true;
+        }
+
         break;
       }
       case AID_SAMPLING: {
         // end clock
         struct timeval tv;
         gettimeofday(&tv, NULL);
-        ws->aid_chunk_end_time[thread_id] = tv.tv_sec * 1000000 + tv.tv_usec;
+        ws->aid_consumed_time[thread_id] = tv.tv_sec * 1000000 + tv.tv_usec - ws->aid_consumed_time[thread_id];
         unsigned cnt = __sync_add_and_fetch (&ws->aid_thread_sampling_completed, 1);
         if (cnt >= nthreads) {
           // The current thread is the last one which finish its sampling phase
@@ -317,8 +380,8 @@ gomp_iter_aid_static_next (long *pstart, long *pend)
           ws->aid_states[thread_id] = AID_RUNNING;
 
           // calculating speedup
-          unsigned long bigcore_avg = 0;
-          unsigned long smallcore_avg = 0;
+          unsigned long bigcore_time = 0;
+          unsigned long smallcore_time = 0;
           /* WARNING
             two assumption:
             1. the number of threads must be equal to the core number
@@ -328,39 +391,30 @@ gomp_iter_aid_static_next (long *pstart, long *pend)
           */
 
           for (int i = 0; i < nthreads / 2; ++i) {
-            smallcore_avg += ws->aid_chunk_end_time[i] = ws->aid_chunk_start_time[i];
+            smallcore_time += ws->aid_consumed_time[i];
           }
           for (int i = nthreads / 2; i < nthreads; ++i) {
-            bigcore_avg += ws->aid_chunk_end_time[i] = ws->aid_chunk_start_time[i];
+            bigcore_time += ws->aid_consumed_time[i];
           }
-          unsigned sf = smallcore_avg / bigcore_avg;
-          ws->aid_sf = sf == 0? 1: sf;
+          unsigned sf, k;
+          sf = smallcore_time / bigcore_time;
+          if (sf == 0) sf = 1;
+          // TODO: it should be more general
+          k = ws->aid_ni / ((ws->aid_sf + 1) * nthreads / 2);
 
-          ws->aid_k = ws->aid_ni / ((ws->aid_sf + 1) * nthreads / 2);
+          ws->aid_sf = sf;
+          ws->aid_k = k;
 
-          printf ("gomp tid (%d) calculated sf = %u(origin: %u), k = %u with ni = %ld, nthreads = %d\n",
-                  thread_id, ws->aid_sf, sf, ws->aid_k, ws->aid_ni, nthreads);
+          AID_LOG ("tid (%d) calculated sf = %u(small/big: %lu/%lu), k = %u with ni = %ld, nthreads = %d",
+                  thread_id, sf, smallcore_time, bigcore_time, k, ws->aid_ni, nthreads);
 
           // statically allocate iterations based its core type
-          if (thread_id < nthreads / 2 ) {
-            long allocated_iter = ws->aid_k;
-            allocated_iter = allocated_iter > ws->aid_allocated_iter[thread_id]? allocated_iter - ws->aid_allocated_iter[thread_id]: 0;
-            if (incr < 0) allocated_iter = -allocated_iter;
-            printf ("gomp tid (%d) allocated %ld iter in WAITING, with %ld iter executed\n", thread_id, allocated_iter, ws->aid_allocated_iter[thread_id]);
-            AID_RUNNING_NEXT_BY(allocated_iter);
-          } else {
-            long allocated_iter = ws->aid_k * ws->aid_sf;
-            allocated_iter = allocated_iter > ws->aid_allocated_iter[thread_id]? allocated_iter - ws->aid_allocated_iter[thread_id]: 0;
-            if (incr < 0) allocated_iter = -allocated_iter;
-            printf ("gomp tid (%d) allocated %ld iter in WAITING, with %ld iter executed\n", thread_id, allocated_iter, ws->aid_allocated_iter[thread_id]);
-            AID_RUNNING_NEXT_BY(allocated_iter);
-          }
-
+          AID_STATIC_NEXT_WITH(k, sf, on_big_core);
         } else {
           ws->aid_states[thread_id] = AID_WAITING;
 
           // steal CHUNK iterations
-          AID_RUNNING_NEXT_BY(chunk);
+          STEAL_NEXT_BY(chunk);
         }
         break;
       }
@@ -370,44 +424,18 @@ gomp_iter_aid_static_next (long *pstart, long *pend)
         if (sf > 0 && k > 0) {
           // It means all threads have prepared for AID RUNNING
           ws->aid_states[thread_id] = AID_RUNNING;
-
-          if (thread_id < nthreads / 2 ) {
-            long allocated_iter = k;
-            allocated_iter = allocated_iter > ws->aid_allocated_iter[thread_id]? allocated_iter - ws->aid_allocated_iter[thread_id]: 0;
-            if (incr < 0) allocated_iter = -allocated_iter;
-            printf ("gomp tid (%d) allocated %ld iter in WAITING, with %ld iter executed\n", thread_id, allocated_iter, ws->aid_allocated_iter[thread_id]);
-            AID_RUNNING_NEXT_BY(allocated_iter);
-          } else {
-            long allocated_iter = k * sf;
-            allocated_iter = allocated_iter > ws->aid_allocated_iter[thread_id]? allocated_iter - ws->aid_allocated_iter[thread_id]: 0;
-            if (incr < 0) allocated_iter = -allocated_iter;
-            printf ("gomp tid (%d) allocated %ld iter in WAITING, with %ld iter executed\n", thread_id, allocated_iter, ws->aid_allocated_iter[thread_id]);
-            AID_RUNNING_NEXT_BY(allocated_iter);
-          }
+          AID_STATIC_NEXT_WITH(k, sf, on_big_core);
         } else {
           // steal CHUNK iterations
-          AID_RUNNING_NEXT_BY(chunk);
+          STEAL_NEXT_BY(chunk);
         }
         break;
       }
       case AID_RUNNING: {
-        printf ("gomp Warnning: tid (%d) into running\n", thread_id);
+        AID_LOG ("Warnning: tid (%d) into running", thread_id);
         unsigned k = ws->aid_k;
         unsigned sf = ws->aid_sf;
-        if (thread_id < nthreads / 2 ) {
-          long allocated_iter = k;
-          allocated_iter = allocated_iter > ws->aid_allocated_iter[thread_id]? allocated_iter - ws->aid_allocated_iter[thread_id]: 0;
-          if (incr < 0) allocated_iter = -allocated_iter;
-          printf ("gomp tid (%d) allocated %ld iter in WAITING, with %ld iter executed\n", thread_id, allocated_iter, ws->aid_allocated_iter[thread_id]);
-          AID_RUNNING_NEXT_BY(allocated_iter);
-        } else {
-          long allocated_iter = k * sf;
-          allocated_iter = allocated_iter > ws->aid_allocated_iter[thread_id]? allocated_iter - ws->aid_allocated_iter[thread_id]: 0;
-          if (incr < 0) allocated_iter = -allocated_iter;
-          printf ("gomp tid (%d) allocated %ld iter in WAITING, with %ld iter executed\n", thread_id, allocated_iter, ws->aid_allocated_iter[thread_id]);
-          AID_RUNNING_NEXT_BY(allocated_iter);
-        }
-
+        AID_STATIC_NEXT_WITH(k, sf, on_big_core);
         break;
       }
       default:
@@ -415,7 +443,7 @@ gomp_iter_aid_static_next (long *pstart, long *pend)
     }
   }
 
-  printf ("tid %d, Unimplemented for gomp_work_share->mode != 1, mode=%d\n", thread_id, ws->mode);
+  AID_LOG ("tid %d, Unimplemented for gomp_work_share->mode != 1, mode=%d\n", thread_id, ws->mode);
   exit(0);
 
 
