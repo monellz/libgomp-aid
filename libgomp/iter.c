@@ -31,7 +31,7 @@
 #include <sys/time.h>
 
 
-#define AID_DEBUG
+//#define AID_DEBUG
 
 #ifdef AID_DEBUG
 #include <stdio.h>
@@ -39,7 +39,7 @@
     do {    \
         fprintf(stdout, "[AID] " format "\n", ##__VA_ARGS__); \
     } while (0)
-#elif
+#else
 #define AID_LOG(...) do {} while (0)
 #endif
 
@@ -400,7 +400,7 @@ gomp_iter_aid_static_next (long *pstart, long *pend)
           sf = smallcore_time / bigcore_time;
           if (sf == 0) sf = 1;
           // TODO: it should be more general
-          k = ws->aid_ni / ((ws->aid_sf + 1) * nthreads / 2);
+          k = ws->aid_ni / ((sf + 1) * nthreads / 2);
 
           ws->aid_sf = sf;
           ws->aid_k = k;
@@ -432,10 +432,8 @@ gomp_iter_aid_static_next (long *pstart, long *pend)
         break;
       }
       case AID_RUNNING: {
-        AID_LOG ("Warnning: tid (%d) into running", thread_id);
-        unsigned k = ws->aid_k;
-        unsigned sf = ws->aid_sf;
-        AID_STATIC_NEXT_WITH(k, sf, on_big_core);
+        AID_LOG ("Warnning: tid (%d) into running, now it uses openmp dynamic", thread_id);
+        STEAL_NEXT_BY(chunk);
         break;
       }
       default:
