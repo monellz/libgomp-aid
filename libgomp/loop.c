@@ -178,20 +178,6 @@ static bool
 gomp_loop_aid_static_start (long start, long end, long incr, long chunk_size,
 			long *istart, long *iend)
 {
-  /*
-  struct gomp_thread *thr = gomp_thread ();
-
-  thr->ts.static_trip = 0;
-  if (gomp_work_share_start (false))
-    {
-      gomp_loop_init (thr->ts.work_share, start, end, incr,
-		      GFS_STATIC, chunk_size);
-      gomp_work_share_init_done ();
-    }
-
-  return !gomp_iter_static_next (istart, iend);
-  */
-
   struct gomp_thread *thr = gomp_thread ();
   bool ret;
 
@@ -561,12 +547,6 @@ gomp_loop_aid_static_next (long *istart, long *iend)
 #ifdef HAVE_SYNC_BUILTINS
   ret = gomp_iter_aid_static_next (istart, iend);
 #else
-  /*
-  struct gomp_thread *thr = gomp_thread ();
-  gomp_mutex_lock (&thr->ts.work_share->lock);
-  ret = gomp_iter_dynamic_next_locked (istart, iend);
-  gomp_mutex_unlock (&thr->ts.work_share->lock);
-  */
   gomp_fatal ("unimplemented for gomp_iter_aid_static_next_locked");
 #endif
 
