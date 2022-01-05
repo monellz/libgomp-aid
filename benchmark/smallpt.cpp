@@ -1,6 +1,7 @@
 #include <math.h>   // smallpt, a Path Tracer by Kevin Beason, 2008
 #include <stdlib.h> // Make : g++ -O3 -fopenmp smallpt.cpp -o smallpt
 #include <stdio.h>  //        Remove "-fopenmp" for g++ version < 4.2
+#include <sys/time.h>
 struct Vec {        // Usage: time ./smallpt 5000 && xv image.ppm
   double x, y, z;                  // position, also color (r,g,b)
   Vec(double x_=0, double y_=0, double z_=0){ x=x_; y=y_; z=z_; }
@@ -76,9 +77,10 @@ int main(int argc, char *argv[]){
   int w=1024, h=768, samps = argc==2 ? atoi(argv[1])/4 : 1; // # samples
   Ray cam(Vec(50,52,295.6), Vec(0,-0.042612,-1).norm()); // cam pos, dir
   Vec cx=Vec(w*.5135/h), cy=(cx%cam.d).norm()*.5135, r, *c=new Vec[w*h];
-#pragma omp parallel for schedule(dynamic, 1) private(r)       // OpenMP
+  timeval s,e;
+  gettimeofday(&s, NULL);
+#pragma omp parallel for schedule(runtime) private(r)       // OpenMP
   for (int y=0; y<h; y++){                       // Loop over image rows
-    fprintf(stderr,"\rRendering (%d spp) %5.2f%%",samps*4,100.*y/(h-1));
     for (unsigned short x=0, Xi[3]={0,0,y*y*y}; x<w; x++)   // Loop cols
       for (int sy=0, i=(h-y-1)*w+x; sy<2; sy++)     // 2x2 subpixel rows
         for (int sx=0; sx<2; sx++, r=Vec()){        // 2x2 subpixel cols
@@ -92,6 +94,9 @@ int main(int argc, char *argv[]){
           c[i] = c[i] + Vec(clamp(r.x),clamp(r.y),clamp(r.z))*.25;
         }
   }
+  gettimeofday(&e, NULL);
+  double tot = (e.tv_sec - s.tv_sec) * 1000.0 + (e.tv_usec - s.tv_usec) / 1000.0;
+  printf("Time: %lf ms\n", tot);
   FILE *f = fopen("image.ppm", "w");         // Write image to PPM file.
   fprintf(f, "P3\n%d %d\n%d\n", w, h, 255);
   for (int i=0; i<w*h; i++)
