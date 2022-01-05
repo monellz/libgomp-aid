@@ -13,7 +13,8 @@ set(GCC_VERSION "8.3.0")
 
 set(MPFR_URL "https://www.mpfr.org/mpfr-${MPFR_VERSION}/mpfr-${MPFR_VERSION}.zip")
 set(GMP_URL "https://gmplib.org/download/gmp/gmp-${GMP_VERSION}.tar.bz2")
-set(ISL_URL "http://isl.gforge.inria.fr/isl-${ISL_VERSION}.tar.bz2")
+#set(ISL_URL "http://isl.gforge.inria.fr/isl-${ISL_VERSION}.tar.bz2")
+set(ISL_URL "https://gcc.gnu.org/pub/gcc/infrastructure/isl-${ISL_VERSION}.tar.bz2")
 set(MPC_URL "https://ftp.gnu.org/gnu/mpc/mpc-${MPC_VERSION}.tar.gz")
 set(ZLIB_URL "https://zlib.net/fossils/zlib-${ZLIB_VERSION}.tar.gz")
 set(GCC_URL "http://ftp.tsukuba.wide.ad.jp/software/gcc/releases/gcc-${GCC_VERSION}/gcc-${GCC_VERSION}.tar.xz")
@@ -25,14 +26,6 @@ if (NPROC EQUAL 0)
 endif()
 message(STATUS "ProcessorCount: ${NPROC}")
 
-ExternalProject_Add(MPFR
-  PREFIX            MPFR
-  INSTALL_DIR       ${CMAKE_BINARY_DIR}
-  URL               ${MPFR_URL}
-  CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR>
-  BUILD_COMMAND     make -j${NPROC}
-)
-
 ExternalProject_Add(GMP
   PREFIX            GMP
   INSTALL_DIR       ${CMAKE_BINARY_DIR}
@@ -41,11 +34,21 @@ ExternalProject_Add(GMP
   BUILD_COMMAND     make -j${NPROC}
 )
 
+ExternalProject_Add(MPFR
+  PREFIX            MPFR
+  INSTALL_DIR       ${CMAKE_BINARY_DIR}
+  URL               ${MPFR_URL}
+  CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --with-gmp-include=${CMAKE_BINARY_DIR}/include --with-gmp-lib=${CMAKE_BINARY_DIR}/lib
+  BUILD_COMMAND     make -j${NPROC}
+  DEPENDS           GMP
+)
+
+
 ExternalProject_Add(ISL
   PREFIX            ISL
   INSTALL_DIR       ${CMAKE_BINARY_DIR}
   URL               ${ISL_URL}
-  CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR>
+  CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --with-gmp-prefix=${CMAKE_BINARY_DIR}
   BUILD_COMMAND     make -j${NPROC}
 )
 

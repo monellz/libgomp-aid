@@ -31,7 +31,7 @@
 #include <sys/time.h>
 
 
-//#define AID_DEBUG
+#define AID_DEBUG
 
 #ifdef AID_DEBUG
 #include <stdio.h>
@@ -397,7 +397,7 @@ gomp_iter_aid_static_next (long *pstart, long *pend)
             bigcore_time += ws->aid_consumed_time[i];
           }
           unsigned sf, k;
-          sf = smallcore_time / bigcore_time;
+          sf = (bigcore_time + smallcore_time - 1) / smallcore_time;
           if (sf == 0) sf = 1;
           // TODO: it should be more general
           k = ws->aid_ni / ((sf + 1) * nthreads / 2);
